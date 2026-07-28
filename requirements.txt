@@ -24,3 +24,7 @@ kagglehub==0.2.5
 # ---- Notebook ----
 jupyter==1.0.0
 notebook==7.1.2
+
+# ---- Dev / test ----
+pytest==8.1.1
+httpx==0.27.2                 # <0.28 required by FastAPI's TestClient
