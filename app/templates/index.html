@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pneumonia Detection — MLOps Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--muted:#94a3b8;--accent:#38bdf8;--accent2:#818cf8;
+        --ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--text:#e2e8f0;--border:#334155;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif;}
+  body{background:var(--bg);color:var(--text);line-height:1.5;}
+  header{background:linear-gradient(135deg,#1e293b,#0f172a);padding:20px 28px;border-bottom:1px solid var(--border);}
+  h1{font-size:1.5rem;display:flex;align-items:center;gap:10px;}
+  h1 .badge{font-size:.7rem;background:var(--accent2);color:#fff;padding:3px 8px;border-radius:6px;font-weight:600;}
+  .sub{color:var(--muted);font-size:.9rem;margin-top:4px;}
+  .statusbar{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;}
+  .chip{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;min-width:130px;}
+  .chip .label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .chip .val{font-size:1.15rem;font-weight:700;margin-top:2px;}
+  .dot{height:9px;width:9px;border-radius:50%;display:inline-block;margin-right:6px;}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok);} .dot.off{background:var(--bad);}
+  nav{display:flex;gap:6px;padding:0 28px;background:var(--bg);border-bottom:1px solid var(--border);}
+  nav button{background:none;border:none;color:var(--muted);padding:14px 18px;cursor:pointer;font-size:.95rem;border-bottom:2px solid transparent;}
+  nav button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+  main{padding:28px;max-width:1100px;margin:0 auto;}
+  .tab{display:none;} .tab.active{display:block;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:20px;}
+  .card h2{font-size:1.15rem;margin-bottom:6px;} .card p.hint{color:var(--muted);font-size:.9rem;margin-bottom:16px;}
+  .drop{border:2px dashed var(--border);border-radius:12px;padding:34px;text-align:center;cursor:pointer;transition:.2s;}
+  .drop:hover{border-color:var(--accent);background:#0f172a;}
+  .drop img{max-height:230px;border-radius:10px;margin-top:14px;}
+  button.btn{background:var(--accent);color:#04263a;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer;font-size:.95rem;}
+  button.btn:hover{filter:brightness(1.1);} button.btn:disabled{opacity:.5;cursor:not-allowed;}
+  button.btn.secondary{background:var(--accent2);color:#fff;} input,select{background:#0f172a;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px;}
+  .result{margin-top:18px;padding:18px;border-radius:12px;border:1px solid var(--border);}
+  .result.normal{background:rgba(34,197,94,.1);border-color:var(--ok);}
+  .result.pneu{background:rgba(239,68,68,.1);border-color:var(--bad);}
+  .result h3{font-size:1.4rem;} .bar{height:12px;background:#0f172a;border-radius:6px;overflow:hidden;margin-top:8px;}
+  .bar span{display:block;height:100%;background:var(--accent);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;} @media(max-width:800px){.grid{grid-template-columns:1fr;}}
+  canvas{max-height:280px;}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;} td,th{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+  .interpret{background:#0f172a;border-left:3px solid var(--accent2);padding:12px 14px;border-radius:0 8px 8px 0;margin-top:12px;font-size:.9rem;color:#cbd5e1;}
+  .log{background:#0f172a;border-radius:8px;padding:12px;font-family:monospace;font-size:.82rem;color:var(--muted);white-space:pre-wrap;max-height:200px;overflow:auto;}
+  .flex{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .spin{border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;width:18px;height:18px;animation:sp 1s linear infinite;display:inline-block;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🫁 Pneumonia Detection <span class="badge">MLOps</span></h1>
+  <div class="sub">Chest X-ray classifier · MobileNetV2 transfer learning · FastAPI + TensorFlow</div>
+  <div class="statusbar" id="statusbar">
+    <div class="chip"><div class="label">Server</div><div class="val"><span class="dot off" id="sd"></span><span id="sv">…</span></div></div>
+    <div class="chip"><div class="label">Model</div><div class="val" id="md">…</div></div>
+    <div class="chip"><div class="label">Uptime</div><div class="val" id="up">…</div></div>
+    <div class="chip"><div class="label">Predictions</div><div class="val" id="pc">0</div></div>
+    <div class="chip"><div class="label">Pending uploads</div><div class="val" id="pu">0</div></div>
+  </div>
+</header>
+
+<nav>
+  <button class="active" data-tab="predict">🔍 Predict</button>
+  <button data-tab="insights">📊 Data Insights</button>
+  <button data-tab="retrain">⬆️ Upload &amp; Retrain</button>
+</nav>
+
+<main>
+  <!-- ============ PREDICT ============ -->
+  <section class="tab active" id="predict">
+    <div class="card">
+      <h2>Predict a single chest X-ray</h2>
+      <p class="hint">Upload one X-ray image (JPEG/PNG). The model returns NORMAL or PNEUMONIA with a confidence score.</p>
+      <div class="drop" id="drop">
+        <div id="dropText">📁 Click or drop an X-ray image here</div>
+        <img id="preview" style="display:none" />
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" />
+      <div style="margin-top:16px" class="flex">
+        <button class="btn" id="predictBtn" disabled>Predict</button>
+        <span id="predSpin" style="display:none" class="spin"></span>
+      </div>
+      <div id="predResult"></div>
+    </div>
+  </section>
+
+  <!-- ============ INSIGHTS ============ -->
+  <section class="tab" id="insights">
+    <div class="card">
+      <h2>Dataset visualisations &amp; interpretations</h2>
+      <p class="hint">Three features of the chest X-ray dataset, each with the story it tells.</p>
+      <div class="grid">
+        <div><h3 style="font-size:1rem">1 · Class distribution</h3><canvas id="chartClass"></canvas>
+          <div class="interpret" id="intClass">Loading…</div></div>
+        <div><h3 style="font-size:1rem">2 · Mean brightness per class</h3><canvas id="chartBright"></canvas>
+          <div class="interpret" id="intBright">Loading…</div></div>
+      </div>
+      <div style="margin-top:20px"><h3 style="font-size:1rem">3 · Image dimensions (acquisition consistency)</h3>
+        <canvas id="chartDim"></canvas>
+        <div class="interpret" id="intDim">Loading…</div></div>
+    </div>
+    <div class="card">
+      <h2>Deployed model — evaluation metrics</h2>
+      <p class="hint">Metrics of the model currently serving predictions in production.</p>
+      <table id="metricsTable"><tbody><tr><td>Loading…</td></tr></tbody></table>
+    </div>
+  </section>
+
+  <!-- ============ RETRAIN ============ -->
+  <section class="tab" id="retrain">
+    <div class="card">
+      <h2>1 · Upload new labelled data (bulk)</h2>
+      <p class="hint">Upload multiple X-ray images and tag them with the correct class. They are stored and used for retraining.</p>
+      <div class="flex">
+        <select id="uploadLabel"><option value="NORMAL">NORMAL</option><option value="PNEUMONIA">PNEUMONIA</option></select>
+        <input type="file" id="uploadFiles" accept="image/*" multiple />
+        <button class="btn secondary" id="uploadBtn">Upload</button>
+        <span id="upSpin" style="display:none" class="spin"></span>
+      </div>
+      <div id="uploadResult" style="margin-top:14px"></div>
+    </div>
+    <div class="card">
+      <h2>2 · Trigger retraining</h2>
+      <p class="hint">Press the button to retrain the model on the full dataset including your newly uploaded images.
+         The model auto-recommends retraining once enough new data accumulates.</p>
+      <div class="flex">
+        <label>Model: <select id="modelType"><option value="mobilenet">MobileNetV2 (transfer)</option><option value="cnn">Custom CNN</option></select></label>
+        <label>Epochs: <input type="number" id="epochs" value="8" min="1" max="50" style="width:70px" /></label>
+        <button class="btn" id="retrainBtn">🚀 Trigger Retraining</button>
+        <span id="rtSpin" style="display:none" class="spin"></span>
+      </div>
+      <div class="log" id="retrainLog" style="margin-top:14px">Retrain status: idle</div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let selectedFile = null;
+
+// ---------- status polling ----------
+async function poll(){
+  try{
+    const s = await (await fetch('/status')).json();
+    $('sd').className = 'dot on'; $('sv').textContent = 'online';
+    $('md').textContent = s.model_available ? '✅ ready' : '⚠️ untrained';
+    $('up').textContent = s.uptime_human;
+    $('pc').textContent = s.prediction_count;
+    $('pu').textContent = s.pending_uploads.total;
+    const r = s.retrain;
+    if(r.running){ $('retrainLog').textContent = 'Retrain status: 🔄 ' + r.message + ' (started '+r.started_at+')'; }
+    else if(r.last_result){ $('retrainLog').textContent = 'Retrain status: ✅ '+r.message+
+        '\nImages added: '+r.last_result.total_images_added+
+        '\nNew accuracy: '+(r.last_result.new_metrics.accuracy*100).toFixed(2)+'%'+
+        '  F1: '+r.last_result.new_metrics.f1_score.toFixed(3); }
+  }catch(e){ $('sd').className='dot off'; $('sv').textContent='offline'; }
+}
+setInterval(poll, 4000); poll();
+
+// ---------- tabs ----------
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); $(b.dataset.tab).classList.add('active');
+  if(b.dataset.tab==='insights') loadInsights();
+});
+
+// ---------- predict ----------
+$('drop').onclick = ()=>$('fileInput').click();
+$('fileInput').onchange = e => setFile(e.target.files[0]);
+$('drop').ondragover = e=>{e.preventDefault();};
+$('drop').ondrop = e=>{e.preventDefault(); setFile(e.dataTransfer.files[0]);};
+function setFile(f){ if(!f) return; selectedFile=f;
+  const img=$('preview'); img.src=URL.createObjectURL(f); img.style.display='inline-block';
+  $('dropText').textContent=f.name; $('predictBtn').disabled=false; $('predResult').innerHTML=''; }
+
+$('predictBtn').onclick = async ()=>{
+  if(!selectedFile) return;
+  $('predSpin').style.display='inline-block'; $('predictBtn').disabled=true;
+  const fd=new FormData(); fd.append('file', selectedFile);
+  try{
+    const res = await fetch('/predict',{method:'POST',body:fd});
+    const d = await res.json();
+    if(!res.ok){ $('predResult').innerHTML=`<div class="result pneu"><b>Error:</b> ${d.detail}</div>`; }
+    else{
+      const isPneu = d.prediction==='PNEUMONIA';
+      $('predResult').innerHTML=`
+        <div class="result ${isPneu?'pneu':'normal'}">
+          <h3>${isPneu?'🔴':'🟢'} ${d.prediction}</h3>
+          <p>Confidence: <b>${(d.confidence*100).toFixed(2)}%</b></p>
+          <div style="margin-top:10px">NORMAL ${(d.probabilities.NORMAL*100).toFixed(1)}%
+            <div class="bar"><span style="width:${d.probabilities.NORMAL*100}%;background:var(--ok)"></span></div></div>
+          <div style="margin-top:8px">PNEUMONIA ${(d.probabilities.PNEUMONIA*100).toFixed(1)}%
+            <div class="bar"><span style="width:${d.probabilities.PNEUMONIA*100}%;background:var(--bad)"></span></div></div>
+        </div>`;
+    }
+  }catch(e){ $('predResult').innerHTML=`<div class="result pneu">Request failed: ${e}</div>`; }
+  $('predSpin').style.display='none'; $('predictBtn').disabled=false; poll();
+};
+
+// ---------- insights ----------
+let charts={};
+async function loadInsights(){
+  try{
+    const d = await (await fetch('/visualizations')).json();
+    const classes = Object.keys(d.class_counts);
+    const counts = classes.map(c=>d.class_counts[c]);
+    drawBar('chartClass','# images', classes, counts, ['#22c55e','#ef4444']);
+    const total = counts.reduce((a,b)=>a+b,0);
+    $('intClass').innerHTML = `<b>Story:</b> The dataset holds <b>${total}</b> images and is
+      <b>imbalanced</b> — PNEUMONIA cases outnumber NORMAL. We counter this with
+      <i>class weights</i> during training so the model is not biased toward the majority class.`;
+
+    const bClasses=Object.keys(d.brightness);
+    const bMeans=bClasses.map(c=>d.brightness[c].mean);
+    drawBar('chartBright','mean pixel intensity (0–255)', bClasses, bMeans, ['#38bdf8','#818cf8']);
+    $('intBright').innerHTML = `<b>Story:</b> Average brightness differs between classes —
+      pneumonia X-rays often show denser (whiter) opacities in the lungs, nudging their mean
+      intensity. This is exactly the visual signal the CNN learns to detect.`;
+
+    drawScatter('chartDim', d.dimensions);
+    $('intDim').innerHTML = `<b>Story:</b> Raw X-rays arrive in many resolutions. Consistent input is
+      essential, so preprocessing resizes <i>every</i> image to 150×150 before it reaches the model —
+      removing acquisition variability as a confounder.`;
+  }catch(e){ $('intClass').textContent='Could not load dataset (is data/ populated?): '+e; }
+  loadMetrics();
+}
+function drawBar(id,label,labels,data,colors){
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart($(id),{type:'bar',data:{labels,datasets:[{label,data,backgroundColor:colors}]},
+    options:{plugins:{legend:{labels:{color:'#e2e8f0'}}},scales:{x:{ticks:{color:'#94a3b8'}},y:{ticks:{color:'#94a3b8'}}}}});
+}
+function drawScatter(id,dims){
+  if(charts[id]) charts[id].destroy();
+  const byClass={};
+  dims.forEach(p=>{(byClass[p.class]=byClass[p.class]||[]).push({x:p.width,y:p.height});});
+  const palette={NORMAL:'#22c55e',PNEUMONIA:'#ef4444'};
+  charts[id]=new Chart($(id),{type:'scatter',data:{datasets:Object.keys(byClass).map(c=>(
+    {label:c,data:byClass[c],backgroundColor:palette[c]||'#38bdf8'}))},
+    options:{plugins:{legend:{labels:{color:'#e2e8f0'}}},
+      scales:{x:{title:{display:true,text:'width (px)',color:'#94a3b8'},ticks:{color:'#94a3b8'}},
+              y:{title:{display:true,text:'height (px)',color:'#94a3b8'},ticks:{color:'#94a3b8'}}}}});
+}
+async function loadMetrics(){
+  const res = await fetch('/metrics');
+  if(!res.ok){ $('metricsTable').innerHTML='<tbody><tr><td>No metrics yet — train the model first.</td></tr></tbody>'; return; }
+  const m = await res.json();
+  $('metricsTable').innerHTML=`<tbody>
+    <tr><th>Accuracy</th><td>${(m.accuracy*100).toFixed(2)}%</td></tr>
+    <tr><th>Precision</th><td>${(m.precision*100).toFixed(2)}%</td></tr>
+    <tr><th>Recall (sensitivity)</th><td>${(m.recall*100).toFixed(2)}%</td></tr>
+    <tr><th>F1 score</th><td>${m.f1_score.toFixed(3)}</td></tr>
+    <tr><th>AUC</th><td>${m.auc?m.auc.toFixed(3):'—'}</td></tr>
+    <tr><th>Loss</th><td>${m.loss.toFixed(3)}</td></tr>
+    <tr><th>Test samples</th><td>${m.n_test_samples}</td></tr>
+    <tr><th>Confusion matrix</th><td>${JSON.stringify(m.confusion_matrix)}</td></tr></tbody>`;
+}
+
+// ---------- upload & retrain ----------
+$('uploadBtn').onclick = async ()=>{
+  const files=$('uploadFiles').files;
+  if(!files.length){ alert('Choose at least one image.'); return; }
+  $('upSpin').style.display='inline-block';
+  const fd=new FormData(); for(const f of files) fd.append('files',f);
+  fd.append('label',$('uploadLabel').value);
+  try{
+    const d = await (await fetch('/upload',{method:'POST',body:fd})).json();
+    $('uploadResult').innerHTML=`✅ Saved <b>${d.saved}</b> image(s) as <b>${d.label}</b>.
+      Pending: NORMAL ${d.pending_uploads.NORMAL}, PNEUMONIA ${d.pending_uploads.PNEUMONIA}
+      (total ${d.pending_uploads.total}/${d.retrain_threshold}).
+      ${d.auto_retrain_recommended?'<b style="color:var(--warn)"> Threshold reached — retraining recommended!</b>':''}`;
+  }catch(e){ $('uploadResult').textContent='Upload failed: '+e; }
+  $('upSpin').style.display='none'; poll();
+};
+
+$('retrainBtn').onclick = async ()=>{
+  if(!confirm('Trigger a full retraining run? This may take several minutes.')) return;
+  $('rtSpin').style.display='inline-block'; $('retrainBtn').disabled=true;
+  const fd=new FormData(); fd.append('model_type',$('modelType').value); fd.append('epochs',$('epochs').value);
+  try{
+    const d = await (await fetch('/retrain',{method:'POST',body:fd})).json();
+    $('retrainLog').textContent='Retrain status: '+(d.message||d.detail);
+  }catch(e){ $('retrainLog').textContent='Retrain failed to start: '+e; }
+  $('rtSpin').style.display='none'; $('retrainBtn').disabled=false;
+  setTimeout(poll,1000);
+};
+</script>
+</body>
+</html>

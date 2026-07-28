@@ -1,0 +1,23 @@
+# render.yaml — one-click deploy to Render.com (free tier, public URL, Docker).
+# 1. Push this repo to GitHub.
+# 2. On render.com -> New -> Blueprint -> pick your repo. Render reads this file.
+# 3. It builds the Dockerfile and gives you a public https URL.
+#
+# NOTE: the free tier disk is ephemeral, so the trained model must be committed
+# to the repo (models/pneumonia_model.keras) OR trained via the /retrain button
+# after deploy. For a persistent model across restarts, attach a Render disk.
+services:
+  - type: web
+    name: pneumonia-detection-mlops
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+    # Optional persistent storage for models + uploaded retraining data:
+    # disk:
+    #   name: model-store
+    #   mountPath: /app/models
+    #   sizeGB: 1

@@ -1,0 +1,16 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.ipynb_checkpoints/
+notebook/
+results/
+*.csv
+# Ship the trained model, but not the multi-GB raw dataset:
+data/train/
+data/test/
+data/val/
+data/uploads/
+DELIVERABLES-GUIDE/

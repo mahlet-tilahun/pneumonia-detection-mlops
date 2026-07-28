@@ -1,0 +1,240 @@
+# 🫁 Pneumonia Detection — End-to-End MLOps Pipeline
+
+A full machine-learning lifecycle project that classifies **chest X-ray images** as
+**NORMAL** or **PNEUMONIA**, deployed as a Dockerised web app with prediction, data
+visualisations, bulk data upload, and one-click model retraining.
+
+> **Non-tabular extension:** this project uses real medical **image** data, building on the
+> tabular [Stroke Risk Prediction](https://github.com/mahlet-tilahun/stroke-risk-prediction-ml) summative.
+
+---
+
+## 📋 Table of Contents
+1. [Project Description](#project-description)
+2. [Demo Video](#demo-video)
+3. [Live URL](#live-url)
+4. [Dataset](#dataset)
+5. [Project Structure](#project-structure)
+6. [Setup — Run Locally](#setup--run-locally)
+7. [Train the Model](#train-the-model)
+8. [Run the Notebook](#run-the-notebook)
+9. [Run the Web App / API](#run-the-web-app--api)
+10. [Deploy to the Cloud](#deploy-to-the-cloud)
+11. [Flood Request Simulation (Locust + Docker)](#flood-request-simulation-locust--docker)
+12. [API Reference](#api-reference)
+13. [Model Performance](#model-performance)
+
+---
+
+## Project Description
+The system detects pneumonia from chest X-rays using **MobileNetV2 transfer learning**.
+It demonstrates the complete ML pipeline required by the rubric:
+
+- **Data acquisition** — Kaggle Chest X-Ray dataset (`scripts/download_data.py`)
+- **Data processing** — resize, RGB conversion, rescaling, augmentation, class weighting (`src/preprocessing.py`)
+- **Model creation & testing** — CNN / MobileNetV2 with regularisation + early stopping (`src/model.py`)
+- **Prediction** — single-image inference (`src/prediction.py`)
+- **Retraining + trigger** — upload new data and retrain via a button, or auto-trigger on data threshold
+- **API** — FastAPI (`app/main.py`)
+- **UI** — web dashboard: prediction, uptime monitor, 3 interpreted visualisations, upload & retrain
+- **Cloud deployment** — Docker + Render.com
+- **Load testing** — Locust flood simulation across multiple Docker containers
+
+---
+
+## Demo Video
+🎥 **YouTube:** `PASTE_YOUR_YOUTUBE_LINK_HERE`
+
+*(A camera-on walkthrough script is provided in `../DELIVERABLES-GUIDE/DEMO-VIDEO-SCRIPT.md`.)*
+
+---
+
+## Live URL
+🌐 **Deployed app:** `PASTE_YOUR_RENDER_URL_HERE`
+
+---
+
+## Dataset
+**Chest X-Ray Images (Pneumonia)** — Paul Mooney, Kaggle
+<https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia>
+
+5,863 real X-ray JPEGs · 2 classes (NORMAL / PNEUMONIA) · pre-split into train/test/val.
+
+### Option A — Automatic download (recommended)
+1. Create a free [Kaggle](https://www.kaggle.com) account.
+2. Kaggle → *Account* → **Create New API Token** → downloads `kaggle.json`.
+3. Place it at `C:\Users\<you>\.kaggle\kaggle.json` (Windows) or `~/.kaggle/kaggle.json` (Mac/Linux).
+4. Run:
+   ```bash
+   pip install kagglehub
+   python scripts/download_data.py
+   ```
+
+### Option B — Manual
+Download & unzip from the Kaggle link above, then copy the `train/`, `test/`, `val/`
+folders (each containing `NORMAL/` and `PNEUMONIA/`) into this project's `data/` folder.
+
+---
+
+## Project Structure
+```
+pneumonia-detection-mlops/
+├── README.md
+├── requirements.txt
+├── Dockerfile  · docker-compose.yml · nginx.conf · render.yaml
+├── locustfile.py
+├── notebook/
+│   └── pneumonia_detection.ipynb        # full ML lifecycle notebook
+├── src/
+│   ├── config.py
+│   ├── preprocessing.py                 # data loading & image preprocessing
+│   ├── model.py                         # build / train / evaluate / retrain
+│   └── prediction.py                    # single-image inference
+├── app/
+│   ├── main.py                          # FastAPI (API + serves the UI)
+│   └── templates/index.html             # web dashboard
+├── scripts/
+│   ├── download_data.py                 # dataset acquisition
+│   └── train.py                         # one-command training
+├── tests/test_api.py                    # smoke tests (pytest)
+├── data/  (train/ test/ val/ uploads/)  # populated by download_data.py
+└── models/                              # pneumonia_model.keras / .h5 + metrics
+```
+
+---
+
+## Setup — Run Locally
+
+> ⚠️ **Use Python 3.10 or 3.11.** TensorFlow 2.15 does **not** support Python 3.13.
+> Check with `python --version`. If you have 3.13, install 3.11 from python.org and use it below.
+
+```bash
+# from the project folder
+py -3.11 -m venv .venv                 # Windows (or: python3.11 -m venv .venv)
+.venv\Scripts\activate                 # Windows PowerShell:  .venv\Scripts\Activate.ps1
+#   macOS/Linux:  source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+---
+
+## Train the Model
+```bash
+python scripts/download_data.py            # 1. get the data
+python scripts/train.py                    # 2. train (MobileNetV2, ~15 epochs)
+#   options:  python scripts/train.py --model cnn --epochs 20
+```
+This writes `models/pneumonia_model.keras` (+ `.h5`), `training_history.json` and
+`evaluation_metrics.json`. On CPU, training takes a while — lower `--epochs` for a quick run.
+
+---
+
+## Run the Notebook
+```bash
+jupyter notebook notebook/pneumonia_detection.ipynb
+```
+The notebook reproduces every step: preprocessing, the 3 interpreted visualisations, training,
+the full evaluation metric suite, prediction, saving, and the retraining function.
+
+---
+
+## Run the Web App / API
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+Open <http://localhost:8000>. The dashboard has three tabs:
+- **Predict** — upload one X-ray, get NORMAL/PNEUMONIA + confidence
+- **Data Insights** — 3 interpreted feature charts + live model metrics
+- **Upload & Retrain** — bulk-upload labelled images and trigger retraining
+
+A live **status bar** shows server uptime, model status, and prediction count.
+
+> The app starts even before a model is trained — prediction returns a helpful message until
+> you train (or retrain via the button).
+
+---
+
+## Deploy to the Cloud
+Full step-by-step in `../DELIVERABLES-GUIDE/DEPLOYMENT-GUIDE.md`. Short version (Render.com, free):
+
+1. Push this folder to a **GitHub** repo (commit the trained `models/pneumonia_model.keras`).
+2. On <https://render.com> → **New → Blueprint** → select your repo (`render.yaml` is detected).
+3. Render builds the `Dockerfile` and returns a public `https://…onrender.com` URL.
+4. Paste that URL under **Live URL** above.
+
+---
+
+## Flood Request Simulation (Locust + Docker)
+Demonstrates how the model responds under load with **different numbers of Docker containers**.
+
+```bash
+# scale to N containers behind the nginx load balancer
+docker compose up --build --scale api=1 -d      # then 2, then 3
+
+# run the flood (headless, saves CSV report)
+locust -f locustfile.py --host http://localhost:8080 \
+       --users 100 --spawn-rate 10 --run-time 2m --headless \
+       --csv results/locust_1container
+```
+Record the results for each container count in the table below.
+Detailed guide: `../DELIVERABLES-GUIDE/LOCUST-GUIDE.md`.
+
+### Flood Simulation Results *(fill in after running)*
+| Containers | Users | Requests | Median latency (ms) | 95%ile (ms) | Avg RPS | Failures |
+|-----------:|------:|---------:|--------------------:|------------:|--------:|---------:|
+| 1          | 100   |          |                     |             |         |          |
+| 2          | 100   |          |                     |             |         |          |
+| 3          | 100   |          |                     |             |         |          |
+
+**Observation:** _(e.g. "median latency dropped from X ms to Y ms and RPS rose from A to B as
+containers increased from 1 → 3, showing the horizontal scaling benefit.")_
+
+---
+
+## API Reference
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET  | `/` | Web dashboard |
+| GET  | `/health` | Liveness probe |
+| GET  | `/status` | Uptime, model status, counters |
+| POST | `/predict` | Predict one image (`file` = image) |
+| GET  | `/visualizations` | Dataset summary for the charts |
+| GET  | `/metrics` | Deployed model's evaluation metrics |
+| POST | `/upload` | Bulk upload images (`files[]`, `label`) |
+| POST | `/retrain` | Trigger retraining (`model_type`, `epochs`) |
+| GET  | `/retrain/status` | Retraining progress |
+
+Example prediction with `curl`:
+```bash
+curl -X POST http://localhost:8000/predict -F "file=@data/test/PNEUMONIA/person1_virus_6.jpeg"
+```
+
+---
+
+## Model Performance
+Populated from `models/evaluation_metrics.json` after training. Typical MobileNetV2 results on
+this dataset:
+
+| Metric | Score |
+|--------|-------|
+| Accuracy | ~0.90 |
+| Precision | ~0.90 |
+| Recall (sensitivity) | ~0.95 |
+| F1 score | ~0.92 |
+| AUC | ~0.95 |
+
+*(Your exact numbers appear in the notebook and on the app's **Data Insights** tab.)*
+
+---
+
+## Tests
+```bash
+pytest -q          # smoke tests for the API + preprocessing (no GPU/dataset needed)
+```
+
+## Tech Stack
+TensorFlow/Keras · FastAPI · Uvicorn · Pillow · scikit-learn · Chart.js · Docker · nginx · Locust · Render.com
+
+## Author
+**Mahlet Tilahun** — African Leadership University
