@@ -213,18 +213,25 @@ curl -X POST http://localhost:8000/predict -F "file=@data/test/PNEUMONIA/person1
 ---
 
 ## Model Performance
-Populated from `models/evaluation_metrics.json` after training. Typical MobileNetV2 results on
-this dataset:
+Actual results (MobileNetV2 transfer learning) on the held-out **624-image test set**
+(from `models/evaluation_metrics.json`):
 
 | Metric | Score |
-|--------|-------|
-| Accuracy | ~0.90 |
-| Precision | ~0.90 |
-| Recall (sensitivity) | ~0.95 |
-| F1 score | ~0.92 |
-| AUC | ~0.95 |
+|--------|------:|
+| Accuracy | 0.846 |
+| Precision | 0.885 |
+| Recall (sensitivity) | 0.867 |
+| F1 score | 0.876 |
+| AUC | 0.929 |
+| Loss | 0.334 |
 
-*(Your exact numbers appear in the notebook and on the app's **Data Insights** tab.)*
+**Confusion matrix** (rows = actual, cols = predicted): `[[190, 44], [52, 338]]`
+→ NORMAL 190✓/44✗, PNEUMONIA 338✓/52 missed.
+
+*(Exact numbers vary slightly between training runs due to augmentation randomness; the values
+above match the committed model and the notebook's saved outputs.)*
+
+*(These same numbers appear in the notebook and live on the app's **Data Insights** tab.)*
 
 ---
 
