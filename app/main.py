@@ -32,7 +32,7 @@ from starlette.concurrency import run_in_threadpool
 from PIL import UnidentifiedImageError
 
 from src.config import (
-    CLASS_NAMES, UPLOAD_DIR, TRAIN_DIR, TEST_DIR, METRICS_PATH,
+    CLASS_NAMES, UPLOAD_DIR, TRAIN_DIR, TEST_DIR, SAMPLE_DIR, METRICS_PATH,
     RETRAIN_TRIGGER_THRESHOLD, ensure_dirs,
 )
 from src.preprocessing import preprocess_upload_dir, dataset_summary
@@ -151,8 +151,13 @@ async def predict(file: UploadFile = File(...)):
 # ---------------------------------------------------------------------------
 @app.get("/visualizations")
 def visualizations():
-    """Dataset summary powering the 3 interpreted feature charts in the UI."""
-    src_dir = TRAIN_DIR if any(TRAIN_DIR.glob("*/*")) else TEST_DIR
+    """
+    Dataset summary powering the 3 interpreted feature charts in the UI.
+    Prefers the full train set (local dev); on the deployed image, where the
+    full dataset is excluded, it falls back to the small bundled data/sample.
+    """
+    src_dir = next((d for d in (TRAIN_DIR, TEST_DIR, SAMPLE_DIR)
+                    if d.exists() and any(d.glob("*/*"))), SAMPLE_DIR)
     summary = dataset_summary(src_dir)
     return JSONResponse(summary)
 

@@ -16,6 +16,9 @@ TRAIN_DIR = DATA_DIR / "train"      # data/train/NORMAL , data/train/PNEUMONIA
 TEST_DIR = DATA_DIR / "test"        # data/test/NORMAL  , data/test/PNEUMONIA
 VAL_DIR = DATA_DIR / "val"          # optional validation split (created if present)
 UPLOAD_DIR = DATA_DIR / "uploads"   # where user-uploaded retraining images land
+SAMPLE_DIR = DATA_DIR / "sample"    # small sample shipped in the Docker image so the
+                                    # deployed app's Data Insights charts render without
+                                    # the (git-ignored) full dataset present
 
 MODELS_DIR = PROJECT_ROOT / "models"
 MODEL_PATH = MODELS_DIR / "pneumonia_model.keras"   # native Keras format (primary)
