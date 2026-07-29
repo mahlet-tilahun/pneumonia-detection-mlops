@@ -314,18 +314,20 @@ def _retrain_lean(model_type: str = "mobilenet", epochs: int = 2,
                     shutil.move(str(f), str(dst_dir / f"upload_{stamp}_{f.name}"))
                     added[cls] += 1
 
-    # train + evaluate on the sample set (small batch => low memory).
+    # train + evaluate on the sample set. batch_size=2 keeps peak activation memory
+    # tiny so the run fits inside the 512 MB free tier.
     no_val = SAMPLE_DIR / "__no_val__"   # forces an internal validation split
     train_gen, val_gen, test_gen = build_generators(
-        train_dir=SAMPLE_DIR, test_dir=SAMPLE_DIR, val_dir=no_val, batch_size=8,
+        train_dir=SAMPLE_DIR, test_dir=SAMPLE_DIR, val_dir=no_val, batch_size=2,
     )
     class_weights = compute_class_weights(train_gen)
 
-    # Continue training the EXISTING trained model (fine-tune) rather than starting
-    # from scratch: with only ~100 images a fresh model would collapse, whereas
-    # fine-tuning keeps the accuracy and adapts to the newly uploaded data.
+    # Reuse the already-loaded (warmed) model instead of loading a second copy, and
+    # fine-tune it rather than starting from scratch: this keeps both memory and the
+    # accuracy in check on the tiny sample set.
+    from src import prediction as _pred
     try:
-        model = load_model()
+        model = _pred.get_model()
     except Exception:
         model = build_model(model_type=model_type)
     model, _ = train_model(model, train_gen, val_gen, epochs=epochs,
