@@ -13,9 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install deps first (better layer caching)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install SLIM runtime deps only (see requirements-docker.txt).
+# TensorFlow is installed on its own layer first to keep peak memory low and
+# improve build caching. --no-cache-dir avoids filling the build VM's disk.
+COPY requirements-docker.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir tensorflow==2.15.0 && \
+    pip install --no-cache-dir -r requirements-docker.txt
 
 # Copy the project
 COPY . .

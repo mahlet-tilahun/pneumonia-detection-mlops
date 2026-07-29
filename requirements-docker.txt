@@ -1,0 +1,10 @@
+# Slim RUNTIME dependencies for the deployed container ONLY.
+# (Jupyter, Locust, matplotlib, seaborn, pandas, kagglehub live in requirements.txt
+#  and run on the host — they are NOT needed to serve predictions or retrain.)
+tensorflow==2.15.0
+numpy==1.26.4
+scikit-learn==1.4.1.post1     # class weights + evaluation metrics during retraining
+pillow==10.2.0                # image decoding/preprocessing
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9       # file uploads (/predict, /upload)
