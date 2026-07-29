@@ -44,6 +44,11 @@ TEMPLATES = APP_DIR / "templates"
 
 app = FastAPI(title="Pneumonia Detection MLOps", version="1.0.0")
 
+# Serve bundled static assets (e.g. Chart.js) locally so the dashboard works
+# offline / on slow connections instead of depending on a CDN.
+(APP_DIR / "static").mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
+
 # ---------------------------------------------------------------------------
 # In-memory runtime state (uptime + monitoring counters for the UI)
 # ---------------------------------------------------------------------------
