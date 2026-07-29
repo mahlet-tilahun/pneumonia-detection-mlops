@@ -18,7 +18,8 @@ from src.config import CLASS_NAMES, MODEL_PATH, MODEL_PATH_H5
 from src.preprocessing import preprocess_image
 
 _MODEL = None  # module-level cache
-_LOAD_LOCK = threading.Lock()  # ensure the model is loaded only once under load
+_LOAD_LOCK = threading.Lock()   # ensure the model is loaded only once under load
+_INFER_LOCK = threading.Lock()  # serialize inference (Keras predict is not guaranteed thread-safe)
 
 
 def model_is_available() -> bool:
@@ -51,7 +52,8 @@ def predict(source) -> Dict:
     """
     model = get_model()
     batch = preprocess_image(source)
-    prob_pneumonia = float(model.predict(batch, verbose=0).ravel()[0])
+    with _INFER_LOCK:
+        prob_pneumonia = float(model.predict(batch, verbose=0).ravel()[0])
     prob_normal = 1.0 - prob_pneumonia
 
     label_idx = int(prob_pneumonia >= 0.5)

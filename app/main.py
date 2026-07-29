@@ -28,6 +28,7 @@ from typing import List
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from src.config import (
     CLASS_NAMES, UPLOAD_DIR, TRAIN_DIR, TEST_DIR, METRICS_PATH,
@@ -127,8 +128,13 @@ async def predict(file: UploadFile = File(...)):
 
     contents = await file.read()
     try:
-        result = pred.predict(contents)
+        # Run the blocking TensorFlow inference in a worker thread so the async
+        # event loop stays free to read incoming request bodies. Doing inference
+        # directly on the loop corrupts concurrent multipart reads under load.
+        result = await run_in_threadpool(pred.predict, contents)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
     STATE["prediction_count"] += 1
