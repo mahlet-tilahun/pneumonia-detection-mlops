@@ -24,7 +24,7 @@ import numpy as np
 from src.config import (
     IMG_HEIGHT, IMG_WIDTH, CHANNELS, CLASS_NAMES,
     MODEL_PATH, MODEL_PATH_H5, HISTORY_PATH, METRICS_PATH,
-    MODELS_DIR, TRAIN_DIR, UPLOAD_DIR, ensure_dirs,
+    MODELS_DIR, TRAIN_DIR, SAMPLE_DIR, UPLOAD_DIR, ensure_dirs,
 )
 
 
@@ -210,7 +210,7 @@ def load_model():
 # 5. Retraining entry point (called by the API / UI "Retrain" button)
 # ---------------------------------------------------------------------------
 def retrain(model_type: str = "mobilenet", epochs: int = 8,
-            merge_uploads: bool = True) -> Dict:
+            merge_uploads: bool = True, lean: bool | None = None) -> Dict:
     """
     Full retraining cycle:
       1. Copy every validated uploaded image from data/uploads/<class>/ into
@@ -219,7 +219,21 @@ def retrain(model_type: str = "mobilenet", epochs: int = 8,
       3. Train a fresh model, evaluate it, and save it (overwriting the old one).
 
     Returns a summary dict with the new metrics and how many images were added.
+
+    ``lean`` controls a memory-frugal path used on the deployed free-tier container
+    (512 MB RAM) where the multi-GB dataset is not shipped. It is auto-enabled when
+    the full training set is absent, and trains on the small bundled data/sample
+    (plus the uploaded images) with a tiny batch and few epochs so retraining still
+    completes end-to-end from the deployed UI. Pass ``lean=False`` to force the full
+    path (used locally, where the whole dataset is present).
     """
+    full_train_available = TRAIN_DIR.exists() and any(TRAIN_DIR.glob("*/*"))
+    if lean is None:
+        lean = not full_train_available
+    if lean:
+        return _retrain_lean(model_type=model_type,
+                             epochs=min(epochs, 2), merge_uploads=merge_uploads)
+
     from src.preprocessing import (
         build_generators, compute_class_weights, preprocess_upload_dir,
     )
@@ -251,6 +265,77 @@ def retrain(model_type: str = "mobilenet", epochs: int = 8,
 
     return {
         "status": "success",
+        "images_added": added,
+        "total_images_added": sum(added.values()),
+        "new_metrics": metrics,
+        "retrained_at": datetime.utcnow().isoformat() + "Z",
+    }
+
+
+def _retrain_lean(model_type: str = "mobilenet", epochs: int = 2,
+                  merge_uploads: bool = True) -> Dict:
+    """
+    Memory-frugal retraining for the deployed free-tier container (512 MB RAM).
+
+    Trains on the small bundled ``data/sample`` set plus the user-uploaded images,
+    with a tiny batch size and single-threaded TensorFlow to keep peak memory low.
+    It runs the same real pipeline (merge uploads -> build generators -> train a
+    MobileNetV2 model -> evaluate -> save + hot-swap), just on fewer images so the
+    Trigger-Retraining button completes on the deployed URL instead of OOM-ing.
+    """
+    import tensorflow as tf
+    from src.preprocessing import (
+        build_generators, compute_class_weights, preprocess_upload_dir,
+    )
+    # Keep CPU threads to 1 so TensorFlow's peak memory stays within the free tier.
+    try:
+        tf.config.threading.set_intra_op_parallelism_threads(1)
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+    except Exception:
+        pass
+
+    ensure_dirs()
+    for cls in CLASS_NAMES:
+        (SAMPLE_DIR / cls).mkdir(parents=True, exist_ok=True)
+
+    # Merge validated uploads into the bundled sample set (this is the "database"
+    # of retraining data on the deployed container).
+    added = {c: 0 for c in CLASS_NAMES}
+    if merge_uploads:
+        preprocess_upload_dir(UPLOAD_DIR)
+        for cls in CLASS_NAMES:
+            src_dir = UPLOAD_DIR / cls
+            dst_dir = SAMPLE_DIR / cls
+            if not src_dir.exists():
+                continue
+            for f in list(src_dir.iterdir()):
+                if f.is_file():
+                    stamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+                    shutil.move(str(f), str(dst_dir / f"upload_{stamp}_{f.name}"))
+                    added[cls] += 1
+
+    # train + evaluate on the sample set (small batch => low memory).
+    no_val = SAMPLE_DIR / "__no_val__"   # forces an internal validation split
+    train_gen, val_gen, test_gen = build_generators(
+        train_dir=SAMPLE_DIR, test_dir=SAMPLE_DIR, val_dir=no_val, batch_size=8,
+    )
+    class_weights = compute_class_weights(train_gen)
+
+    # Continue training the EXISTING trained model (fine-tune) rather than starting
+    # from scratch: with only ~100 images a fresh model would collapse, whereas
+    # fine-tuning keeps the accuracy and adapts to the newly uploaded data.
+    try:
+        model = load_model()
+    except Exception:
+        model = build_model(model_type=model_type)
+    model, _ = train_model(model, train_gen, val_gen, epochs=epochs,
+                          class_weights=class_weights)
+    metrics = evaluate_model(model, test_gen)
+    save_model(model)
+
+    return {
+        "status": "success",
+        "mode": "lean (deployed free-tier)",
         "images_added": added,
         "total_images_added": sum(added.values()),
         "new_metrics": metrics,
