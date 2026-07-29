@@ -18,6 +18,7 @@ GET  /retrain/status   -> progress of the current/last retraining run
 """
 from __future__ import annotations
 
+import os
 import time
 import json
 import threading
@@ -209,13 +210,13 @@ async def upload(files: List[UploadFile] = File(...), label: str = Form(...)):
 # ---------------------------------------------------------------------------
 # Retraining trigger
 # ---------------------------------------------------------------------------
-def _run_retrain(model_type: str, epochs: int):
+def _run_retrain(model_type: str, epochs: int, lean=None):
     from src.model import retrain
     try:
         STATE["retrain"].update({"running": True, "message": "retraining in progress...",
                                  "started_at": datetime.utcnow().isoformat() + "Z",
                                  "finished_at": None})
-        result = retrain(model_type=model_type, epochs=epochs)
+        result = retrain(model_type=model_type, epochs=epochs, lean=lean)
         pred.reset_model_cache()  # serve the freshly trained model
         STATE["retrain"].update({"running": False, "message": "completed",
                                  "last_result": result,
@@ -231,13 +232,31 @@ def _run_retrain(model_type: str, epochs: int):
 @app.post("/retrain")
 def retrain_endpoint(background_tasks: BackgroundTasks,
                      model_type: str = Form("mobilenet"),
-                     epochs: int = Form(8)):
+                     epochs: int = Form(8),
+                     lean: str = Form("")):
+    # "Quick demo" checkbox -> force the fast lean retrain (fine-tunes on the small
+    # sample) so a retraining run completes in ~1 minute on camera. Unset = auto
+    # (full retrain locally, where the whole dataset is present).
+    lean_flag = True if str(lean).lower() in ("1", "true", "on", "yes") else None
+    # On the free-tier cloud instance (512 MB RAM) a TensorFlow training run cannot
+    # fit in memory, so live retraining is disabled there to keep the service stable.
+    # Uploads still work; retraining is run locally / on a higher-RAM host (see the
+    # demo video and notebook). Locally this flag is unset and retraining runs fully.
+    if os.environ.get("SERVER_RETRAIN_DISABLED") == "1":
+        return {
+            "status": "unavailable",
+            "message": ("Live retraining is disabled on this free-tier deployment "
+                        "(512 MB RAM is insufficient to train TensorFlow). Your uploaded "
+                        "data is saved; retraining runs locally and is shown in the demo "
+                        "video and the notebook."),
+        }
     if not _retrain_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A retraining run is already in progress.")
-    background_tasks.add_task(_run_retrain, model_type, int(epochs))
+    background_tasks.add_task(_run_retrain, model_type, int(epochs), lean_flag)
     return {"status": "started",
             "message": "Retraining triggered. Poll /retrain/status for progress.",
-            "model_type": model_type, "epochs": int(epochs)}
+            "model_type": model_type, "epochs": int(epochs),
+            "mode": "quick-demo (lean)" if lean_flag else "full"}
 
 
 @app.get("/retrain/status")

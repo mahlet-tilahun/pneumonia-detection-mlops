@@ -16,6 +16,10 @@ services:
     envVars:
       - key: PORT
         value: 8000
+      # The free tier (512 MB) cannot train TensorFlow in memory, so live retraining
+      # is disabled on the server to keep it stable; retraining runs locally.
+      - key: SERVER_RETRAIN_DISABLED
+        value: "1"
     # Optional persistent storage for models + uploaded retraining data:
     # disk:
     #   name: model-store

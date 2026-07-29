@@ -128,6 +128,7 @@
       <div class="flex">
         <label>Model: <select id="modelType"><option value="mobilenet">MobileNetV2 (transfer)</option><option value="cnn">Custom CNN</option></select></label>
         <label>Epochs: <input type="number" id="epochs" value="8" min="1" max="50" style="width:70px" /></label>
+        <label title="Fine-tunes on a small sample so retraining finishes in ~1 minute (great for a live demo)."><input type="checkbox" id="quickDemo" /> Quick demo (fast)</label>
         <button class="btn" id="retrainBtn">🚀 Trigger Retraining</button>
         <span id="rtSpin" style="display:none" class="spin"></span>
       </div>
@@ -276,9 +277,11 @@ $('uploadBtn').onclick = async ()=>{
 };
 
 $('retrainBtn').onclick = async ()=>{
-  if(!confirm('Trigger a full retraining run? This may take several minutes.')) return;
+  const quick=$('quickDemo').checked;
+  if(!confirm(quick?'Run a quick demo retraining (~1 min on the sample)?':'Trigger a full retraining run? This may take several minutes.')) return;
   $('rtSpin').style.display='inline-block'; $('retrainBtn').disabled=true;
   const fd=new FormData(); fd.append('model_type',$('modelType').value); fd.append('epochs',$('epochs').value);
+  fd.append('lean', quick?'1':'');
   try{
     const d = await (await fetch('/retrain',{method:'POST',body:fd})).json();
     $('retrainLog').textContent='Retrain status: '+(d.message||d.detail);
