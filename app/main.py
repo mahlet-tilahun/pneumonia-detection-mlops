@@ -29,6 +29,7 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTa
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
+from PIL import UnidentifiedImageError
 
 from src.config import (
     CLASS_NAMES, UPLOAD_DIR, TRAIN_DIR, TEST_DIR, METRICS_PATH,
@@ -127,14 +128,16 @@ async def predict(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Please upload an image file.")
 
     contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Empty file uploaded.")
     try:
         # Run the blocking TensorFlow inference in a worker thread so the async
-        # event loop stays free to read incoming request bodies. Doing inference
-        # directly on the loop corrupts concurrent multipart reads under load.
+        # event loop stays free to read incoming request bodies under load.
         result = await run_in_threadpool(pred.predict, contents)
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=400,
+                            detail="Uploaded file is not a valid image.")
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
     STATE["prediction_count"] += 1
