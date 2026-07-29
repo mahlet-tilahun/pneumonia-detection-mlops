@@ -50,7 +50,11 @@ It demonstrates the complete ML pipeline required by the rubric:
 ---
 
 ## Live URL
-🌐 **Deployed app:** `PASTE_YOUR_RENDER_URL_HERE`
+🌐 **Deployed app:** https://pneumonia-detection-mlops.onrender.com
+
+> Hosted on Render's free tier, which **spins down after ~15 min of inactivity** — the first
+> request after idle takes ~30–60 s to wake the container, then it is fast. Hit the URL once
+> before demoing.
 
 ---
 
