@@ -1,4 +1,4 @@
-# 🫁 Pneumonia Detection — End-to-End MLOps Pipeline
+# Pneumonia Detection — End-to-End MLOps Pipeline
 
 A full machine-learning lifecycle project that classifies **chest X-ray images** as
 **NORMAL** or **PNEUMONIA**, deployed as a Dockerised web app with prediction, data
@@ -9,20 +9,25 @@ visualisations, bulk data upload, and one-click model retraining.
 
 ---
 
-## 📋 Table of Contents
-1. [Project Description](#project-description)
-2. [Demo Video](#demo-video)
-3. [Live URL](#live-url)
-4. [Dataset](#dataset)
-5. [Project Structure](#project-structure)
-6. [Setup — Run Locally](#setup--run-locally)
-7. [Train the Model](#train-the-model)
-8. [Run the Notebook](#run-the-notebook)
-9. [Run the Web App / API](#run-the-web-app--api)
-10. [Deploy to the Cloud](#deploy-to-the-cloud)
-11. [Flood Request Simulation (Locust + Docker)](#flood-request-simulation-locust--docker)
-12. [API Reference](#api-reference)
-13. [Model Performance](#model-performance)
+## Table of Contents
+1. [Demo Video & Live App](#demo-video--live-app)
+2. [Project Description](#project-description)
+3. [Dataset](#dataset)
+4. [Project Structure](#project-structure)
+5. [Setup — Run Locally](#setup--run-locally)
+6. [Train the Model](#train-the-model)
+7. [Run the Notebook](#run-the-notebook)
+8. [Run the Web App / API](#run-the-web-app--api)
+9. [Flood Request Simulation (Locust + Docker)](#flood-request-simulation-locust--docker)
+10. [API Reference](#api-reference)
+11. [Model Performance](#model-performance)
+
+---
+
+## Demo Video & Live App
+**Demo video (YouTube):** `PASTE_YOUR_YOUTUBE_LINK_HERE`
+
+**Live app:** https://pneumonia-detection-mlops.onrender.com
 
 ---
 
@@ -39,22 +44,6 @@ It demonstrates the complete ML pipeline required by the rubric:
 - **UI** — web dashboard: prediction, uptime monitor, 3 interpreted visualisations, upload & retrain
 - **Cloud deployment** — Docker + Render.com
 - **Load testing** — Locust flood simulation across multiple Docker containers
-
----
-
-## Demo Video
-🎥 **YouTube:** `PASTE_YOUR_YOUTUBE_LINK_HERE`
-
-*(A camera-on walkthrough script is provided in `../DELIVERABLES-GUIDE/DEMO-VIDEO-SCRIPT.md`.)*
-
----
-
-## Live URL
-🌐 **Deployed app:** https://pneumonia-detection-mlops.onrender.com
-
-> Hosted on Render's free tier, which **spins down after ~15 min of inactivity** — the first
-> request after idle takes ~30–60 s to wake the container, then it is fast. Hit the URL once
-> before demoing.
 
 ---
 
@@ -109,7 +98,7 @@ pneumonia-detection-mlops/
 
 ## Setup — Run Locally
 
-> ⚠️ **Use Python 3.10 or 3.11.** TensorFlow 2.15 does **not** support Python 3.13.
+> **Use Python 3.10 or 3.11.** TensorFlow 2.15 does **not** support Python 3.13.
 > Check with `python --version`. If you have 3.13, install 3.11 from python.org and use it below.
 
 ```bash
@@ -154,19 +143,6 @@ Open <http://localhost:8000>. The dashboard has three tabs:
 
 A live **status bar** shows server uptime, model status, and prediction count.
 
-> The app starts even before a model is trained — prediction returns a helpful message until
-> you train (or retrain via the button).
-
----
-
-## Deploy to the Cloud
-Full step-by-step in `../DELIVERABLES-GUIDE/DEPLOYMENT-GUIDE.md`. Short version (Render.com, free):
-
-1. Push this folder to a **GitHub** repo (commit the trained `models/pneumonia_model.keras`).
-2. On <https://render.com> → **New → Blueprint** → select your repo (`render.yaml` is detected).
-3. Render builds the `Dockerfile` and returns a public `https://…onrender.com` URL.
-4. Paste that URL under **Live URL** above.
-
 ---
 
 ## Flood Request Simulation (Locust + Docker)
@@ -181,7 +157,6 @@ locust -f locustfile.py --host http://localhost:8080 \
        --users 15 --spawn-rate 5 --run-time 60s --headless \
        --csv results/locust_1container
 ```
-Detailed guide: `../DELIVERABLES-GUIDE/LOCUST-GUIDE.md`.
 
 ### Flood Simulation Results
 **Setup:** 15 concurrent users, 60 s per run, identical load at each scale. Each API
@@ -248,12 +223,11 @@ Actual results (MobileNetV2 transfer learning) on the held-out **624-image test 
 | Loss | 0.334 |
 
 **Confusion matrix** (rows = actual, cols = predicted): `[[190, 44], [52, 338]]`
-→ NORMAL 190✓/44✗, PNEUMONIA 338✓/52 missed.
+(NORMAL: 190 correct, 44 misclassified; PNEUMONIA: 338 correct, 52 missed).
 
 *(Exact numbers vary slightly between training runs due to augmentation randomness; the values
-above match the committed model and the notebook's saved outputs.)*
-
-*(These same numbers appear in the notebook and live on the app's **Data Insights** tab.)*
+above match the committed model and the notebook's saved outputs, and appear on the app's
+Data Insights tab.)*
 
 ---
 
@@ -266,4 +240,4 @@ pytest -q          # smoke tests for the API + preprocessing (no GPU/dataset nee
 TensorFlow/Keras · FastAPI · Uvicorn · Pillow · scikit-learn · Chart.js · Docker · nginx · Locust · Render.com
 
 ## Author
-**Mahlet Tilahun** — African Leadership University
+Mahlet Tilahun — African Leadership University
