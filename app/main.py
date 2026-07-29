@@ -58,6 +58,14 @@ _retrain_lock = threading.Lock()
 @app.on_event("startup")
 def _startup():
     ensure_dirs()
+    # Warm the model into memory at startup so the first burst of requests does
+    # not collide on a cold lazy-load (which caused 500s under a Locust flood).
+    if pred.model_is_available():
+        try:
+            pred.get_model()
+            print("[startup] model warmed and ready.")
+        except Exception as e:
+            print(f"[startup] model warmup failed (will retry on first request): {e}")
 
 
 # ---------------------------------------------------------------------------

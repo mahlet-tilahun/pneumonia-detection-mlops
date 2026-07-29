@@ -18,6 +18,14 @@ services:
     volumes:
       - ./models:/app/models      # persist the trained model across restarts
       - ./data:/app/data          # persist uploaded/retraining data
+    # Cap each replica to 1 CPU so that scaling 1->2->3 containers gives each
+    # its own core on the shared 4-core host — making the throughput/latency
+    # improvement from horizontal scaling actually measurable in the flood test.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2g
 
   lb:
     image: nginx:alpine

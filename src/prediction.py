@@ -10,12 +10,15 @@ from __future__ import annotations
 
 from typing import Dict
 
+import threading
+
 import numpy as np
 
 from src.config import CLASS_NAMES, MODEL_PATH, MODEL_PATH_H5
 from src.preprocessing import preprocess_image
 
 _MODEL = None  # module-level cache
+_LOAD_LOCK = threading.Lock()  # ensure the model is loaded only once under load
 
 
 def model_is_available() -> bool:
@@ -23,11 +26,13 @@ def model_is_available() -> bool:
 
 
 def get_model():
-    """Lazy-load and cache the trained Keras model."""
+    """Lazy-load and cache the trained Keras model (thread-safe, loads once)."""
     global _MODEL
     if _MODEL is None:
-        from src.model import load_model
-        _MODEL = load_model()
+        with _LOAD_LOCK:
+            if _MODEL is None:  # double-checked locking
+                from src.model import load_model
+                _MODEL = load_model()
     return _MODEL
 
 
