@@ -182,12 +182,25 @@ def save_model(model) -> None:
 
 
 def load_model():
-    """Load the trained model, preferring the native .keras file."""
+    """
+    Load the trained model. Tries the native .keras file first, then falls back
+    to the legacy .h5 copy. The fallback matters because some TensorFlow/Keras
+    builds fail to restore a nested pretrained MobileNetV2 from the .keras zip
+    format ("Layer 'Conv1' expected 1 variables, but received 0") while the .h5
+    file loads reliably everywhere — including the slim Docker runtime image.
+    """
     import tensorflow as tf
-    if MODEL_PATH.exists():
-        return tf.keras.models.load_model(MODEL_PATH)
-    if MODEL_PATH_H5.exists():
-        return tf.keras.models.load_model(MODEL_PATH_H5)
+    errors = []
+    for path in (MODEL_PATH, MODEL_PATH_H5):
+        if path.exists():
+            try:
+                return tf.keras.models.load_model(path)
+            except Exception as e:  # try the next format
+                errors.append(f"{path.name}: {type(e).__name__}: {e}")
+    if errors:
+        raise RuntimeError(
+            "Found model file(s) but none could be loaded:\n  " + "\n  ".join(errors)
+        )
     raise FileNotFoundError(
         "No trained model found. Run `python scripts/train.py` first."
     )
