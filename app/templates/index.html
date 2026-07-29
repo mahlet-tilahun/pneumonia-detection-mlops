@@ -209,20 +209,20 @@ async function loadInsights(){
     const counts = classes.map(c=>d.class_counts[c]);
     drawBar('chartClass','# images', classes, counts, ['#22c55e','#ef4444']);
     const total = counts.reduce((a,b)=>a+b,0);
-    $('intClass').innerHTML = `<b>Story:</b> The dataset holds <b>${total}</b> images and is
-      <b>imbalanced</b> — PNEUMONIA cases outnumber NORMAL. We counter this with
+    $('intClass').innerHTML = `The dataset holds <b>${total}</b> images and is
+      <b>imbalanced</b>, with PNEUMONIA cases outnumbering NORMAL. We counter this with
       <i>class weights</i> during training so the model is not biased toward the majority class.`;
 
     const bClasses=Object.keys(d.brightness);
     const bMeans=bClasses.map(c=>d.brightness[c].mean);
     drawBar('chartBright','mean pixel intensity (0–255)', bClasses, bMeans, ['#38bdf8','#818cf8']);
-    $('intBright').innerHTML = `<b>Story:</b> Average brightness differs between classes —
+    $('intBright').innerHTML = `Average brightness differs between classes, because
       pneumonia X-rays often show denser (whiter) opacities in the lungs, nudging their mean
       intensity. This is exactly the visual signal the CNN learns to detect.`;
 
     drawScatter('chartDim', d.dimensions);
-    $('intDim').innerHTML = `<b>Story:</b> Raw X-rays arrive in many resolutions. Consistent input is
-      essential, so preprocessing resizes <i>every</i> image to 150×150 before it reaches the model —
+    $('intDim').innerHTML = `Raw X-rays arrive in many resolutions. Consistent input is
+      essential, so preprocessing resizes <i>every</i> image to 150×150 before it reaches the model,
       removing acquisition variability as a confounder.`;
   }catch(e){ $('intClass').textContent='Could not load dataset (is data/ populated?): '+e; }
   loadMetrics();
