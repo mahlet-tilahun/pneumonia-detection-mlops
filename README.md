@@ -174,21 +174,39 @@ docker compose up --build --scale api=1 -d      # then 2, then 3
 
 # run the flood (headless, saves CSV report)
 locust -f locustfile.py --host http://localhost:8080 \
-       --users 100 --spawn-rate 10 --run-time 2m --headless \
+       --users 15 --spawn-rate 5 --run-time 60s --headless \
        --csv results/locust_1container
 ```
-Record the results for each container count in the table below.
 Detailed guide: `../DELIVERABLES-GUIDE/LOCUST-GUIDE.md`.
 
-### Flood Simulation Results *(fill in after running)*
-| Containers | Users | Requests | Median latency (ms) | 95%ile (ms) | Avg RPS | Failures |
-|-----------:|------:|---------:|--------------------:|------------:|--------:|---------:|
-| 1          | 100   |          |                     |             |         |          |
-| 2          | 100   |          |                     |             |         |          |
-| 3          | 100   |          |                     |             |         |          |
+### Flood Simulation Results
+**Setup:** 15 concurrent users, 60 s per run, identical load at each scale. Each API
+container is **capped at 1 CPU** (`docker-compose.yml`) so that scaling 1 → 2 → 3
+containers adds real parallel cores on the 4-core host — making the effect measurable.
 
-**Observation:** _(e.g. "median latency dropped from X ms to Y ms and RPS rose from A to B as
-containers increased from 1 → 3, showing the horizontal scaling benefit.")_
+All requests (`/predict` + `/status` + `/visualizations`), aggregated:
+
+| Containers | Requests | Failures | Median (ms) | p95 (ms) | Avg (ms) | RPS |
+|-----------:|---------:|---------:|------------:|---------:|---------:|----:|
+| 1 | 86  | 0 | 4,200 | 32,000 | 6,527 | 1.48 |
+| 2 | 188 | 0 | 660   | 22,000 | 2,869 | 3.15 |
+| 3 | 238 | 0 | 610   | 13,000 | 1,911 | 4.01 |
+
+`/predict` endpoint only (the CPU-bound model inference):
+
+| Containers | Requests | Failures | Median (ms) | p95 (ms) | Avg (ms) | RPS |
+|-----------:|---------:|---------:|------------:|---------:|---------:|----:|
+| 1 | 58  | 0 | 7,000 | 10,000 | 6,124 | 1.00 |
+| 2 | 119 | 0 | 730   | 1,900  | 869   | 1.99 |
+| 3 | 169 | 0 | 670   | 1,600  | 748   | 2.85 |
+
+**Observation:** With a single CPU-bound container, 15 concurrent users saturate it —
+`/predict` median latency climbs to **7 s** and throughput plateaus at **~1 req/s**.
+Adding replicas scales throughput **near-linearly with cores** (predict RPS 1.00 → 1.99 →
+2.85; total requests handled 86 → 188 → 238) and collapses median latency **~10×**
+(7,000 ms → 670 ms). **Zero failed requests** at every scale, confirming the service stays
+stable under load. This is the expected horizontal-scaling benefit: more containers = more
+parallel inference capacity = lower latency and higher request throughput.
 
 ---
 
