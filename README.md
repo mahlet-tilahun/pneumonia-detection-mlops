@@ -25,7 +25,9 @@ visualisations, bulk data upload, and one-click model retraining.
 ---
 
 ## Demo Video & Live App
-**Demo video :** https://www.loom.com/share/ef494fd582f548bd943ba09d826ffdde
+**Demo video:** 
+- **YouTube**: https://youtu.be/jVn-xjJrQBo?si=lq-27MFcHNFbvtBq
+- https://www.loom.com/share/ef494fd582f548bd943ba09d826ffdde
 
 **Live app:** https://pneumonia-detection-mlops.onrender.com
 
